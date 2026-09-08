@@ -1,1 +1,44 @@
+name: Build APK
 
+on:
+  workflow_dispatch:
+  push:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Locate project
+        run: |
+          if [ ! -f settings.gradle.kts ]; then
+            ZIP=$(ls *.zip 2>/dev/null | head -1 || true)
+            [ -n "$ZIP" ] && unzip -q -o "$ZIP" -d _src
+            SG=$(find . -name settings.gradle.kts | head -1)
+            if [ -z "$SG" ]; then
+              echo "::error::No settings.gradle.kts anywhere"; ls -la; exit 1
+            fi
+            ROOT=$(dirname "$SG")
+            [ "$ROOT" != "." ] && cp -r "$ROOT"/. .
+          fi
+          ls -la
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: android-actions/setup-android@v3
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.7'
+
+      - run: gradle assembleRelease --no-daemon --stacktrace
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: waretrack-apk
+          path: app/build/outputs/apk/release/*.apk
+          if-no-files-found: error
